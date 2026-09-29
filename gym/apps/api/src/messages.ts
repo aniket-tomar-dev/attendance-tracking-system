@@ -16,9 +16,6 @@ export const M = {
   helpCustomer: "Commands:\nCHECKIN <GYM_CODE>\nHISTORY\nPROGRESS",
 };
 export function calendar(year: number, month: number, days: number[]): string {
-  const set = new Set(days);
-  const first = new Date(year, month, 1).getDay(); // 0 = Sun
-  const total = new Date(year, month + 1, 0).getDate();
   const names = [
     "Jan",
     "Feb",
@@ -33,17 +30,17 @@ export function calendar(year: number, month: number, days: number[]): string {
     "Nov",
     "Dec",
   ];
-
-  let out = `📅 ${names[month]} ${year}\nSu Mo Tu We Th Fr Sa\n`;
-  let line = "   ".repeat(first);
-  for (let d = 1; d <= total; d++) {
-    line += (set.has(d) ? "🟢" : String(d).padStart(2, " ")) + " ";
-    if ((first + d) % 7 === 0) {
-      out += line.trimEnd() + "\n";
-      line = "";
+  const total = new Date(year, month + 1, 0).getDate();
+  const set = new Set(days);
+  const rows: string[] = [];
+  for (let start = 1; start <= total; start += 7) {
+    const cells: string[] = [];
+    for (let d = start; d < start + 7 && d <= total; d++) {
+      cells.push(set.has(d) ? "✅" : "▫️");
     }
+    rows.push(cells.join(" ") + `  (${start}-${Math.min(start + 6, total)})`);
   }
-  return "```\n" + (out + line).trimEnd() + "\n```";
+  return `📅 *${names[month]} ${year}*\n${rows.join("\n")}\n\n✅ = Come, ▫️ = Don't come`;
 }
 export function chunk(lines: string[], max = 3800): string[] {
   const out: string[] = [];
