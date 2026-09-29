@@ -40,7 +40,6 @@ export async function handleText(
     await q("select gym_id from owners where phone=$1", [phone])
   )[0];
 
-  console.log("MSG RECEIVED", cmd, phone);
   if (owner) {
     const gym = await getGym(owner.gym_id);
     try {
