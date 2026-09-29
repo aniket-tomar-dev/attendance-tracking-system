@@ -1,0 +1,2 @@
+{"name":"gym-attendance","private":true,"workspaces":["apps/*","packages/*"],
+"scripts":{"dev:api":"npm -w apps/api run dev","dev:web":"npm -w apps/web run dev","migrate":"npm -w apps/api run migrate","seed":"npm -w apps/api run seed","test":"npm -w apps/api test"}}
