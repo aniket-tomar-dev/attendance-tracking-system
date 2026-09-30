@@ -68,12 +68,31 @@ async function statsText(gym: Gym): Promise<string[]> {
   ];
 }
 
+/* ---------- Add member from WhatsApp ---------- */
+
+const ADD_USAGE =
+  "Usage:\nADD <name> <phone>\nExample: ADD Rahul Sharma 9876543210\nor: add member Rahul Sharma +91 98765 43210";
+
+/** Parses "ADD member Rahul Sharma 98765 43210" -> { name, phone } (null if it doesn't fit). */
+function parseAdd(text: string): { name: string; phone: string } | null {
+  const body = text
+    .trim()
+    .replace(/^add\s+(a\s+)?(new\s+)?(member|customer)?\s*/i, "")
+    .trim();
+  const m = body.match(/^(.*?)[\s:,-]*(\+?\d[\d\s-]{6,}\d)\s*$/);
+  if (!m) return null;
+  const name = m[1].trim();
+  const phone = m[2].trim();
+  if (!name) return null;
+  return { name, phone };
+}
+
 /* ---------- Natural-language question detection (English / Hinglish / Hindi) ---------- */
 
 type Intent = "absent" | "today" | "total";
 
 const ABSENT_RE =
-  /(absent|not\s+(come|came|attend|attended|present)|didn'?t\s+(come|attend)|did\s+not\s+(come|attend)|nahi\s*aa|nahin\s*aa|nhi\s*aa|gayab|नहीं\s*आ|नही\s*आ|अनुपस्थित|गैर\s*हाज़?िर)/i;
+  /(absent|not\s+(come|came|attend|attended|present)|(didn'?t|haven'?t|hasn'?t)\s+(come|came|attend|attended|show)|missed|nahi\s*aa|nahin\s*aa|nhi\s*aa|gayab|नहीं\s*आ|नही\s*आ|अनुपस्थित|गैर\s*हाज़?िर)/i;
 const TODAY_RE = /(today|aaj|\bpresent\b|\bcame\b|attended|आज|उपस्थित)/i;
 const TOTAL_RE =
   /(how\s*many|kitne|kitni|total|member|customer|list|count|कितने|मेंबर|मेम्बर|सदस्य|ग्राहक)/i;
@@ -110,11 +129,12 @@ export async function handleText(
     const gym = await getGym(owner.gym_id);
     try {
       if (cmd === "ADD") {
-        const phoneArg = rest[rest.length - 1],
-          name = rest.slice(0, -1).join(" ");
-        if (!name || !phoneArg) return ["Usage: ADD <name> <phone>"];
-        const cu = await addCustomer(gym, name, phoneArg);
-        return [`Added ${cu.name} (${cu.phone}).`];
+        const p = parseAdd(text);
+        if (!p) return [ADD_USAGE];
+        const cu = await addCustomer(gym, p.name, p.phone);
+        return [
+          `✅ Added ${cu.name} (${cu.phone}) to ${gym.name}.\nThey can now check in with: CHECKIN ${gym.gym_code}`,
+        ];
       }
       if (cmd === "TODAY") return await todayText(gym);
       if (cmd === "CUSTOMERS") {
@@ -138,7 +158,7 @@ export async function handleText(
       }
       if (cmd === "HELP") return [M.helpOwner];
 
-      // Free-form questions, e.g. "how many members", "aaj kitne aaye", "kitne nahi aaye"
+      // Free-form questions, e.g. "how many members", "who is absent today"
       if (cmd !== "CHECKIN") {
         const intent = detectIntent(text);
         if (intent === "absent") return await absentText(gym);
