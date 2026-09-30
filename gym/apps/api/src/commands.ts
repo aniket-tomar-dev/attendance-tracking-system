@@ -11,6 +11,7 @@ import {
   listCustomers,
   listToday,
 } from "./services";
+import type { Gym } from "./services";
 
 const base = () => process.env.WEB_ORIGIN ?? "http://localhost:5173";
 
@@ -28,6 +29,71 @@ async function monthCalendar(id: string, tz: string) {
     .map((d) => Number(d.date.slice(8, 10)));
   return calendar(y, m - 1, attended);
 }
+
+/* ---------- Owner-only reports ---------- */
+
+async function totalMembersText(gym: Gym): Promise<string[]> {
+  const all = await listCustomers(gym.id, "", "");
+  const active = all.filter((x) => x.status === "active").length;
+  return chunk([
+    `Total members: ${all.length} (active ${active}, inactive ${all.length - active})`,
+    ...all.map(
+      (x, i) =>
+        `${i + 1}. ${x.name} (${x.phone})${x.status === "active" ? "" : " [inactive]"}`,
+    ),
+  ]);
+}
+async function todayText(gym: Gym): Promise<string[]> {
+  const r = await listToday(gym);
+  return chunk([
+    `Today: ${r.length} check-ins`,
+    ...r.map((x, i) => `${i + 1}. ${x.name}, ${x.time}`),
+  ]);
+}
+async function absentText(gym: Gym): Promise<string[]> {
+  const r = await listAbsent(gym);
+  return chunk([
+    `Absent today: ${r.length}`,
+    ...r.map((x, i) => `${i + 1}. ${x.name}`),
+  ]);
+}
+async function statsText(gym: Gym): Promise<string[]> {
+  const [active, today, absent] = await Promise.all([
+    listCustomers(gym.id, "", "active"),
+    listToday(gym),
+    listAbsent(gym),
+  ]);
+  return [
+    `📊 ${gym.name}\nActive members: ${active.length}\nCame today: ${today.length}\nAbsent today: ${absent.length}`,
+  ];
+}
+
+/* ---------- Natural-language question detection (English / Hinglish / Hindi) ---------- */
+
+type Intent = "absent" | "today" | "total";
+
+const ABSENT_RE =
+  /(absent|not\s+(come|came|attend|attended|present)|didn'?t\s+(come|attend)|did\s+not\s+(come|attend)|nahi\s*aa|nahin\s*aa|nhi\s*aa|gayab|नहीं\s*आ|नही\s*आ|अनुपस्थित|गैर\s*हाज़?िर)/i;
+const TODAY_RE = /(today|aaj|\bpresent\b|\bcame\b|attended|आज|उपस्थित)/i;
+const TOTAL_RE =
+  /(how\s*many|kitne|kitni|total|member|customer|list|count|कितने|मेंबर|मेम्बर|सदस्य|ग्राहक)/i;
+
+function detectIntent(text: string): Intent | null {
+  if (ABSENT_RE.test(text)) return "absent";
+  if (TODAY_RE.test(text)) return "today";
+  if (TOTAL_RE.test(text)) return "total";
+  return null;
+}
+
+const OWNER_ONLY_CMDS = new Set([
+  "ADD",
+  "TODAY",
+  "CUSTOMERS",
+  "ABSENT",
+  "STATS",
+  "SUMMARY",
+]);
+
 /** Returns reply messages for an incoming WhatsApp text. `phone` is E.164 (+...). */
 export async function handleText(
   phone: string,
@@ -50,13 +116,7 @@ export async function handleText(
         const cu = await addCustomer(gym, name, phoneArg);
         return [`Added ${cu.name} (${cu.phone}).`];
       }
-      if (cmd === "TODAY") {
-        const r = await listToday(gym);
-        return chunk([
-          `Today: ${r.length} check-ins`,
-          ...r.map((x, i) => `${i + 1}. ${x.name}, ${x.time}`),
-        ]);
-      }
+      if (cmd === "TODAY") return await todayText(gym);
       if (cmd === "CUSTOMERS") {
         const r = await listCustomers(gym.id, "", "active");
         return chunk([
@@ -64,10 +124,8 @@ export async function handleText(
           ...r.map((x) => `${x.name}: last visit ${x.last_visit ?? "never"}`),
         ]);
       }
-      if (cmd === "ABSENT") {
-        const r = await listAbsent(gym);
-        return chunk([`Absent today: ${r.length}`, ...r.map((x) => x.name)]);
-      }
+      if (cmd === "ABSENT") return await absentText(gym);
+      if (cmd === "STATS" || cmd === "SUMMARY") return await statsText(gym);
       if ((cmd === "HISTORY" || cmd === "PROGRESS") && arg) {
         const f = await findCustomers(gym, arg);
         if (f.length !== 1)
@@ -79,6 +137,14 @@ export async function handleText(
         return [await historyText(f[0].name, f[0].id, gym.timezone)];
       }
       if (cmd === "HELP") return [M.helpOwner];
+
+      // Free-form questions, e.g. "how many members", "aaj kitne aaye", "kitne nahi aaye"
+      if (cmd !== "CHECKIN") {
+        const intent = detectIntent(text);
+        if (intent === "absent") return await absentText(gym);
+        if (intent === "today") return await todayText(gym);
+        if (intent === "total") return await totalMembersText(gym);
+      }
     } catch (e) {
       if (e instanceof AppError) return [e.message];
       throw e;
@@ -128,5 +194,12 @@ export async function handleText(
         : []),
     ];
   }
-  return [cmd === "HELP" ? (owner ? M.helpOwner : M.helpCustomer) : M.unknown];
+
+  if (cmd === "HELP") return [owner ? M.helpOwner : M.helpCustomer];
+
+  // Not an owner: block owner-only commands and owner-type questions.
+  if (!owner && (OWNER_ONLY_CMDS.has(cmd) || detectIntent(text) !== null))
+    return [M.ownerOnly];
+
+  return [M.unknown];
 }

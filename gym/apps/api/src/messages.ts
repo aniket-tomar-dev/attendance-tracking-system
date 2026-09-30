@@ -9,10 +9,12 @@ export const M = {
     "We couldn't find your number. Please ask the gym owner to add you.",
   inactive: "Your membership is inactive. Please contact the gym owner.",
   unknown: "Didn't get that. Send HELP.",
+  ownerOnly:
+    "This information is only available to the gym owner.\nयह जानकारी सिर्फ़ gym owner के लिए है।",
   progress: (n: string, p: Progress) =>
     `${n}: ${p.total} total days, ${p.thisMonth} this month, ${p.currentStreak}-day streak (best ${p.longestStreak}). Last visit: ${p.lastVisit ?? "never"}.`,
   helpOwner:
-    "Commands:\nADD <name> <phone>\nTODAY\nCUSTOMERS\nABSENT\nHISTORY <name or phone>\nPROGRESS <name or phone>",
+    'Commands:\nADD <name> <phone>\nTODAY\nCUSTOMERS\nABSENT\nSTATS\nHISTORY <name or phone>\nPROGRESS <name or phone>\n\nYou can also ask:\n"how many members"\n"aaj kitne aaye"\n"kitne nahi aaye"',
   helpCustomer: "Commands:\nCHECKIN <GYM_CODE>\nHISTORY\nPROGRESS",
 };
 export function calendar(year: number, month: number, days: number[]): string {
