@@ -1,5 +1,5 @@
 import { q } from "./db";
-import { M, chunk, calendar } from "./messages";
+import { M, chunk, calendar, head } from "./messages";
 import {
   AppError,
   addCustomer,
@@ -18,7 +18,7 @@ const base = () => process.env.WEB_ORIGIN ?? "http://localhost:5173";
 async function historyText(name: string, id: string, tz: string) {
   const { progress, days } = await getProgress(id, tz);
   const present = days.filter((d) => d.present).map((d) => d.date.slice(5));
-  return `${M.progress(name, progress)}\nLast 30 days: ${present.length} attended${present.length ? " (" + present.join(", ") + ")" : ""}`;
+  return `${M.progress(name, progress)}\n\n🗓 *Last 30 days:* ${present.length} visits${present.length ? "\n_" + present.join(", ") + "_" : ""}`;
 }
 async function monthCalendar(id: string, tz: string) {
   const { days } = await getProgress(id, tz);
@@ -36,24 +36,24 @@ async function totalMembersText(gym: Gym): Promise<string[]> {
   const all = await listCustomers(gym.id, "", "");
   const active = all.filter((x) => x.status === "active").length;
   return chunk([
-    `Total members: ${all.length} (active ${active}, inactive ${all.length - active})`,
+    `${head("👥", "Members")}\nTotal: *${all.length}*  ·  Active: *${active}*  ·  Inactive: *${all.length - active}*\n`,
     ...all.map(
       (x, i) =>
-        `${i + 1}. ${x.name} (${x.phone})${x.status === "active" ? "" : " [inactive]"}`,
+        `${i + 1}. *${x.name}*  ${x.phone}${x.status === "active" ? "" : "  _(inactive)_"}`,
     ),
   ]);
 }
 async function todayText(gym: Gym): Promise<string[]> {
   const r = await listToday(gym);
   return chunk([
-    `Today: ${r.length} check-ins`,
-    ...r.map((x, i) => `${i + 1}. ${x.name}, ${x.time}`),
+    `${head("🟢", "Today's check-ins")}\nTotal: *${r.length}*\n`,
+    ...r.map((x, i) => `${i + 1}. *${x.name}*  ·  ${x.time}`),
   ]);
 }
 async function absentText(gym: Gym): Promise<string[]> {
   const r = await listAbsent(gym);
   return chunk([
-    `Absent today: ${r.length}`,
+    `${head("🔴", "Absent today")}\nTotal: *${r.length}*\n`,
     ...r.map((x, i) => `${i + 1}. ${x.name}`),
   ]);
 }
@@ -64,14 +64,13 @@ async function statsText(gym: Gym): Promise<string[]> {
     listAbsent(gym),
   ]);
   return [
-    `📊 ${gym.name}\nActive members: ${active.length}\nCame today: ${today.length}\nAbsent today: ${absent.length}`,
+    `${head("📊", gym.name)}\n👥 Active members: *${active.length}*\n🟢 Came today: *${today.length}*\n🔴 Absent today: *${absent.length}*`,
   ];
 }
 
 /* ---------- Add member from WhatsApp ---------- */
 
-const ADD_USAGE =
-  "Usage:\nADD <name> <phone>\nExample: ADD Rahul Sharma 9876543210\nor: add member Rahul Sharma +91 98765 43210";
+const ADD_USAGE = `${head("➕", "Add a member")}\n\`\`\`ADD <name> <phone>\`\`\`\nExample:\n_ADD Rahul Sharma 9876543210_\n_add member Rahul Sharma +91 98765 43210_`;
 
 /** Parses "ADD member Rahul Sharma 98765 43210" -> { name, phone } (null if it doesn't fit). */
 function parseAdd(text: string): { name: string; phone: string } | null {
@@ -133,15 +132,17 @@ export async function handleText(
         if (!p) return [ADD_USAGE];
         const cu = await addCustomer(gym, p.name, p.phone);
         return [
-          `✅ Added ${cu.name} (${cu.phone}) to ${gym.name}.\nThey can now check in with: CHECKIN ${gym.gym_code}`,
+          `${head("✅", "Member added")}\n👤 *${cu.name}*\n📞 ${cu.phone}\n🏋️ ${gym.name}\n\nThey can check in with:\n\`\`\`CHECKIN ${gym.gym_code}\`\`\``,
         ];
       }
       if (cmd === "TODAY") return await todayText(gym);
       if (cmd === "CUSTOMERS") {
         const r = await listCustomers(gym.id, "", "active");
         return chunk([
-          `Active customers: ${r.length}`,
-          ...r.map((x) => `${x.name}: last visit ${x.last_visit ?? "never"}`),
+          `${head("📋", "Active customers")}\nTotal: *${r.length}*\n`,
+          ...r.map(
+            (x, i) => `${i + 1}. *${x.name}*  ·  _${x.last_visit ?? "never"}_`,
+          ),
         ]);
       }
       if (cmd === "ABSENT") return await absentText(gym);
@@ -151,8 +152,8 @@ export async function handleText(
         if (f.length !== 1)
           return [
             f.length
-              ? `${f.length} matches, please use the phone number.`
-              : "No customer found.",
+              ? `⚠️ ${f.length} matches found. Please use the phone number.`
+              : "⚠️ No customer found.",
           ];
         return [await historyText(f[0].name, f[0].id, gym.timezone)];
       }
@@ -194,7 +195,7 @@ export async function handleText(
     ];
     if (r.milestone) out.push(M.milestone(cu.name, r.progress.total));
     out.push(await monthCalendar(cu.id, g.timezone));
-    out.push(`Full progress: ${base()}/p/${cu.progress_token}`);
+    out.push(`🔗 *Full progress:*\n${base()}/p/${cu.progress_token}`);
     return out;
   }
   if (cmd === "HISTORY" || cmd === "PROGRESS") {
@@ -210,7 +211,7 @@ export async function handleText(
       await historyText(cu.name, cu.id, g.timezone),
       await monthCalendar(cu.id, g.timezone),
       ...(cmd === "PROGRESS"
-        ? [`Your progress page: ${base()}/p/${cu.progress_token}`]
+        ? [`🔗 *Your progress page:*\n${base()}/p/${cu.progress_token}`]
         : []),
     ];
   }
