@@ -12,6 +12,14 @@ import {
   listToday,
 } from "./services";
 import type { Gym } from "./services";
+import {
+  dueText,
+  remindOne,
+  markPaid,
+  customerPay,
+  customerPaid,
+  customerCash,
+} from "./fees";
 
 const base = () => process.env.WEB_ORIGIN ?? "http://localhost:5173";
 
@@ -71,6 +79,7 @@ async function statsText(gym: Gym): Promise<string[]> {
 /* ---------- Add member from WhatsApp ---------- */
 
 const ADD_USAGE = `${head("➕", "Add a member")}\n\`\`\`ADD <name> <phone>\`\`\`\nExample:\n_ADD Rahul Sharma 9876543210_\n_add member Rahul Sharma +91 98765 43210_`;
+const REMIND_USAGE = `${head("🔔", "Send fee reminder")}\n\`\`\`REMIND <name or phone>\`\`\`\nExample:\n_REMIND Rahul_`;
 
 /** Parses "ADD member Rahul Sharma 98765 43210" -> { name, phone } (null if it doesn't fit). */
 function parseAdd(text: string): { name: string; phone: string } | null {
@@ -110,6 +119,8 @@ const OWNER_ONLY_CMDS = new Set([
   "ABSENT",
   "STATS",
   "SUMMARY",
+  "DUE",
+  "REMIND",
 ]);
 
 /** Returns reply messages for an incoming WhatsApp text. `phone` is E.164 (+...). */
@@ -157,6 +168,13 @@ export async function handleText(
           ];
         return [await historyText(f[0].name, f[0].id, gym.timezone)];
       }
+
+      // Fees
+      if (cmd === "DUE") return await dueText(gym);
+      if (cmd === "REMIND")
+        return arg ? await remindOne(gym, arg) : [REMIND_USAGE];
+      if (cmd === "PAID" && arg) return await markPaid(gym, arg);
+
       if (cmd === "HELP") return [M.helpOwner];
 
       // Free-form questions, e.g. "how many members", "who is absent today"
@@ -215,6 +233,11 @@ export async function handleText(
         : []),
     ];
   }
+
+  // Fees (customer side)
+  if (cmd === "PAY") return [await customerPay(phone)];
+  if (cmd === "PAID") return [await customerPaid(phone)];
+  if (cmd === "CASH") return [await customerCash(phone)];
 
   if (cmd === "HELP") return [owner ? M.helpOwner : M.helpCustomer];
 

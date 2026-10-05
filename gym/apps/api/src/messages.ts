@@ -17,8 +17,8 @@ export const M = {
   ownerOnly: `${head("🔒", "Owner only")}\nThis information is only available to the gym owner.\nयह जानकारी सिर्फ़ gym owner के लिए है।`,
   progress: (n: string, p: Progress) =>
     `${head("📈", n)}\n🏋️ Total days: *${p.total}*\n📅 This month: *${p.thisMonth}*\n🔥 Streak: *${p.currentStreak}* days (best ${p.longestStreak})\n🕒 Last visit: ${p.lastVisit ?? "never"}`,
-  helpOwner: `${head("🏋️", "Owner commands")}\n➕ *ADD* <name> <phone>\n🟢 *TODAY*  – today's check-ins\n🔴 *ABSENT*  – who didn't come\n📋 *CUSTOMERS*  – active list\n📊 *STATS*  – quick summary\n📈 *HISTORY* <name/phone>\n📈 *PROGRESS* <name/phone>\n\n💬 *You can also ask:*\n_how many members_\n_aaj kitne aaye_\n_kitne nahi aaye_`,
-  helpCustomer: `${head("🏋️", "Commands")}\n✅ *CHECKIN* <GYM_CODE>\n📈 *HISTORY*\n📈 *PROGRESS*`,
+  helpOwner: `${head("🏋️", "Owner commands")}\n➕ *ADD* <name> <phone>\n🟢 *TODAY*  – today's check-ins\n🔴 *ABSENT*  – who didn't come\n📋 *CUSTOMERS*  – active list\n📊 *STATS*  – quick summary\n📈 *HISTORY* <name/phone>\n📈 *PROGRESS* <name/phone>\n💳 *DUE*  – fees due list\n🔔 *REMIND* <name/phone>\n✅ *PAID* <name/phone>\n\n💬 *You can also ask:*\n_how many members_\n_aaj kitne aaye_\n_kitne nahi aaye_`,
+  helpCustomer: `${head("🏋️", "Commands")}\n✅ *CHECKIN* <GYM_CODE>\n📈 *HISTORY*\n📈 *PROGRESS*\n💳 *PAY*  – pay by UPI QR\n💵 *CASH*  – pay at the gym`,
 };
 
 /** Same signature as before. Weekday-aligned; attended days shown as [12]. */
